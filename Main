@@ -1,0 +1,86 @@
+import java.net.*;
+import java.io.*;
+import java.util.*;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.cdimascio.dotenv.Dotenv;
+
+public class Main {
+    static String twitterUrl;
+    static String accessToken;
+    static String tokenType = "Bearer ";
+
+    public static void main(String[] args) {
+        Scanner read = new Scanner(System.in);
+        System.out.println("Enter string");
+        String text = read.next();
+        System.out.println("Enter count");
+        int count = read.nextInt();
+
+        // To load environment variables
+        LoadEnvVariables();
+
+        // Print the top count tweet contents
+        System.out.println(SearchTextInTwitter(text, count));
+    }
+
+    /*
+     * To call the Twitter API with the text and count
+     * */
+    public static ArrayList<String> SearchTextInTwitter(String str, int count) {
+        ArrayList<String> topTweets = new ArrayList<String>();
+        try {
+            URL url = new URL(twitterUrl + "?q=" + str + "&count=" + count);
+            HttpURLConnection conn = CreateConnection(url);
+            if (conn.getResponseCode() == 200) {
+                InputStream input = conn.getInputStream();
+
+                // To get the JSON from the response stream
+                JsonNode node = ConvertInputStreamToJson(input);
+                Iterator<JsonNode> statusElements = node.iterator();
+                while ((statusElements.hasNext())) {
+                    JsonNode statusElement = statusElements.next();
+                    topTweets.add(statusElement.get("text").toString());
+                }
+            }
+            conn.disconnect();
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
+        return topTweets;
+    }
+
+    public static HttpURLConnection CreateConnection(URL url) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("authorization", tokenType + accessToken);
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
+        return conn;
+    }
+
+    public static void LoadEnvVariables() {
+        Dotenv dotenv = Dotenv.configure().directory(".").load();
+        twitterUrl = dotenv.get("twitterUrl");
+        accessToken = dotenv.get("accessToken");
+    }
+
+    public static JsonNode ConvertInputStreamToJson(InputStream inpStr) {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode jsonMap = null;
+        JsonNode node = null;
+        try {
+            jsonMap = mapper.readTree(inpStr);
+            if (jsonMap != null) {
+                node = jsonMap.get("statuses");
+            }
+        } catch (IOException e) {
+            System.out.println(e.toString());
+        }
+        return node;
+    }
+}
